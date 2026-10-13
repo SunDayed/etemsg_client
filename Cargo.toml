@@ -1,0 +1,49 @@
+[package]
+name = "msg-client-rust"
+version = "0.1.0"
+edition = "2021"
+description = "E2EE chat client (TUI, ratatui) — Rust rewrite of chat_tui_linux"
+# openmls 0.9.0 要求 1.91.0；声明低于依赖 MSRV 会让其他构建者失败（本机 1.98.1 不受影响）
+rust-version = "1.91"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+md-5 = "0.10"
+rand = "0.8"
+rsa = { version = "0.9", features = ["sha2", "pem"] }
+aes-gcm = "0.10"
+rusqlite = { version = "0.37", features = ["bundled-sqlcipher"] }
+ratatui = "0.30"
+crossterm = "0.29"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-pki-types = "1"
+x509-parser = "0.16"
+tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }
+chrono = "0.4"
+# 只用 poll(POLLHUP) 判断终端是否已消失（见 ui.rs::terminal_hung_up）
+libc = "0.2"
+
+# 群组模块的错误枚举（1v1 路径不使用）
+thiserror = "2"
+# ── MLS（RFC 9420）──
+# 只用 rust crypto provider；**不启用** sqlite-provider（openmls_sqlite_storage）：
+# 按架构设计，MLS 私密状态由 adapter 序列化为 opaque blob 交给 store.rs(SQLCipher) 持久化，
+# 不需要第二套 SQLite storage provider（也就避免了 rusqlite `bundled` 与 `bundled-sqlcipher` 的特性合并风险）。
+openmls = { version = "0.9", default-features = false, features = ["openmls_rust_crypto"] }
+openmls_traits = "0.6"
+openmls_rust_crypto = "0.6"
+openmls_basic_credential = "0.6"
+# persistence：MemoryStorage 的 save_to_file/load_from_file —— 把**整体 MLS 状态**
+# 序列化成一份 blob 落到 SQLCipher（架构文档 §8 设想的"opaque blob 持久化"就靠它实现）。
+# 这样就不需要 openmls_sqlite_storage（从而不需要实现 72 个方法的 StorageProvider，
+# 也避免 rusqlite `bundled` 与 `bundled-sqlcipher` 的特性合并风险）。
+openmls_memory_storage = { version = "0.6", features = ["persistence"] }
+
+[profile.release]
+opt-level = 2
+lto = "thin"
+strip = true
